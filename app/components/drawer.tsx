@@ -202,8 +202,6 @@ function DrawerPrimitive({
               className
             )}
           >
-            <div className="mx-auto w-12 h-1.5 bg-zinc-200 rounded-full mb-4 shrink-0" />
-
             <motion.div
               animate={{ height }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
