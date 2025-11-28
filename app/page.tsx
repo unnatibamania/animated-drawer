@@ -37,6 +37,7 @@ export default function Home() {
                 title={item.title}
                 description={item.description}
                 Icon={item.Icon}
+                hasSubMenu={item.hasSubmenu ?? false}
               />
             ))}
           </div>
