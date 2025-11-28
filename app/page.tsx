@@ -75,7 +75,7 @@ export default function Home() {
         }}
         onClick={() => setIsOpen(true)}
         className={cn(
-          "bg-blue-600 hover:bg-blue-500",
+          "bg-blue-500 hover:bg-blue-400",
           "px-6 py-3 text-white rounded-full cursor-pointer",
           "transition-colors ease-out duration-300 font-medium shadow-lg shadow-zinc-900/20"
         )}
@@ -85,22 +85,20 @@ export default function Home() {
 
       <Drawer isOpen={isOpen} onClose={handleClose}>
         <div className="flex flex-col gap-4">
-          <header className="flex items-center min-h-[40px] px-2 pb-2">
-            <AnimatePresence mode="popLayout" initial={false}>
-              {menuStack.length > 1 && (
-                <motion.button
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  onClick={handlePop}
-                  className="flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
-                >
-                  <ChevronLeft size={18} />
-                  Back
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </header>
+          <AnimatePresence mode="popLayout" initial={false}>
+            {menuStack.length > 1 && (
+              <motion.button
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                onClick={handlePop}
+                className="flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors"
+              >
+                <ChevronLeft size={18} />
+                Back
+              </motion.button>
+            )}
+          </AnimatePresence>
 
           <div className="relative overflow-hidden">
             <AnimatePresence
@@ -115,7 +113,7 @@ export default function Home() {
                 initial="enter"
                 animate="center"
                 exit="exit"
-                transition={{ type: "spring", bounce: 0, duration: 0.3 }}
+                transition={{ type: "spring", bounce: 0, duration: 0.4 }}
                 className="flex flex-col gap-1 w-full"
               >
                 {currentMenu.items.map((item) => (
