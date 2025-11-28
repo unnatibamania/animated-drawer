@@ -2,7 +2,7 @@
 
 import { cn } from "@/utils/cn";
 import { AnimatePresence, motion, PanInfo } from "motion/react";
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef, useCallback, useId } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, LucideIcon } from "lucide-react";
 import { MenuItem } from "./menu/menu-item";
@@ -12,6 +12,8 @@ interface DrawerPrimitiveProps {
   onClose: () => void;
   children: React.ReactNode;
   className?: string;
+  titleId?: string;
+  descriptionId?: string;
 }
 
 const useMeasure = () => {
@@ -45,9 +47,11 @@ function DrawerPrimitive({
   onClose,
   children,
   className,
+  titleId,
+  descriptionId,
 }: DrawerPrimitiveProps) {
-  const { ref, height } = useMeasure();
-
+  const { ref: measureRef, height } = useMeasure();
+  const drawerRef = useRef<HTMLDivElement>(null);
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -66,6 +70,87 @@ function DrawerPrimitive({
     setIsMounted(true);
     return () => setIsMounted(false);
   }, []);
+
+  // Focus Trap and Keyboard Navigation
+  useEffect(() => {
+    if (isOpen) {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") {
+          onClose();
+        }
+
+        if (e.key === "Tab") {
+          const focusableElements = drawerRef.current?.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          );
+
+          if (!focusableElements || focusableElements.length === 0) return;
+
+          const firstElement = focusableElements[0] as HTMLElement;
+          const lastElement = focusableElements[
+            focusableElements.length - 1
+          ] as HTMLElement;
+
+          if (e.shiftKey) {
+            if (document.activeElement === firstElement) {
+              e.preventDefault();
+              lastElement.focus();
+            }
+          } else {
+            if (document.activeElement === lastElement) {
+              e.preventDefault();
+              firstElement.focus();
+            }
+          }
+        }
+
+        if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+          e.preventDefault(); // Prevent scrolling
+          const focusableElements = Array.from(
+            drawerRef.current?.querySelectorAll(
+              'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            ) || []
+          ) as HTMLElement[];
+
+          if (focusableElements.length === 0) return;
+
+          const currentIndex = focusableElements.indexOf(
+            document.activeElement as HTMLElement
+          );
+          let nextIndex;
+
+          if (e.key === "ArrowDown") {
+            nextIndex = (currentIndex + 1) % focusableElements.length;
+          } else {
+            nextIndex =
+              (currentIndex - 1 + focusableElements.length) %
+              focusableElements.length;
+          }
+
+          focusableElements[nextIndex].focus();
+        }
+      };
+
+      window.addEventListener("keydown", handleKeyDown);
+
+      // Initial focus management
+      const timer = setTimeout(() => {
+        const focusableElements = drawerRef.current?.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements && focusableElements.length > 0) {
+          (focusableElements[0] as HTMLElement).focus();
+        } else {
+          drawerRef.current?.focus();
+        }
+      }, 50);
+
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+        clearTimeout(timer);
+      };
+    }
+  }, [isOpen, onClose]);
 
   const handleDragEnd = (
     event: MouseEvent | TouchEvent | PointerEvent,
@@ -89,10 +174,17 @@ function DrawerPrimitive({
             exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 z-50 bg-black/50"
+            aria-hidden="true"
           />
 
           {/* Drawer Panel */}
           <motion.div
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
+            aria-describedby={descriptionId}
+            tabIndex={-1}
             layout
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -105,17 +197,22 @@ function DrawerPrimitive({
             className={cn(
               "fixed bottom-2 left-2 right-2 z-50",
               "bg-white rounded-3xl",
-              "p-4 shadow-xl",
+              "p-4 shadow-xl outline-none",
               "max-h-[90vh] overflow-hidden flex flex-col",
               className
             )}
           >
+            <div className="mx-auto w-12 h-1.5 bg-zinc-200 rounded-full mb-4 shrink-0" />
+
             <motion.div
               animate={{ height }}
               transition={{ type: "spring", bounce: 0, duration: 0.4 }}
               className="overflow-hidden"
             >
-              <div ref={ref} className="overflow-y-auto custom-scrollbar">
+              <div
+                ref={measureRef}
+                className="overflow-y-auto custom-scrollbar"
+              >
                 {children}
               </div>
             </motion.div>
@@ -129,21 +226,38 @@ function DrawerPrimitive({
 
 // Public Interface
 
+/**
+ * Represents a navigation link item in the drawer
+ */
 export interface DrawerLink {
+  /** Unique identifier for the link */
   id: string;
+  /** Display title of the link */
   title: string;
+  /** Optional description text */
   description?: string;
+  /** Optional icon component */
   Icon?: LucideIcon;
+  /** Optional nested items for submenus */
   items?: DrawerLink[];
 }
 
+/**
+ * Props for the Drawer component
+ */
 export interface DrawerProps {
+  /** Text to display on the trigger button */
   buttonText?: string;
-  className?: string; // For the trigger button
-  drawerClassName?: string; // For the drawer panel
+  /** Class name for the trigger button */
+  className?: string;
+  /** Class name for the drawer panel */
+  drawerClassName?: string;
+  /** Array of navigation links to display */
   links?: DrawerLink[];
+  /** Custom content to display above links */
   children?: React.ReactNode;
-  title?: string; // Optional overall title for the drawer header if needed
+  /** Title for the drawer header */
+  title?: string;
 }
 
 interface MenuLevel {
@@ -152,6 +266,21 @@ interface MenuLevel {
   items: DrawerLink[];
 }
 
+/**
+ * A reusable, accessible drawer component with nested navigation support.
+ * Handles focus management, keyboard navigation, and screen reader support.
+ *
+ * @example
+ * ```tsx
+ * <Drawer
+ *   buttonText="Open Menu"
+ *   title="Main Menu"
+ *   links={[
+ *     { id: 'home', title: 'Home', Icon: HomeIcon }
+ *   ]}
+ * />
+ * ```
+ */
 export function Drawer({
   buttonText = "Open",
   className,
@@ -167,10 +296,19 @@ export function Drawer({
       : []
   );
   const [direction, setDirection] = useState(0);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
-  // Note: If 'links' prop changes dynamically, the parent component should
-  // use a 'key' prop on the Drawer to force a re-mount and reset the state.
-  // e.g. <Drawer key={someId} links={...} />
+  // IDs for accessibility
+  const titleId = useId();
+  const descriptionId = useId();
+
+  // Reset stack if links or title change
+  useEffect(() => {
+    if (links.length > 0) {
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      setMenuStack([{ id: "root", title: title || "Menu", items: links }]);
+    }
+  }, [links, title]);
 
   const currentMenu = menuStack[menuStack.length - 1];
 
@@ -196,6 +334,9 @@ export function Drawer({
 
   const handleClose = () => {
     setIsOpen(false);
+    // Restore focus to trigger button
+    triggerRef.current?.focus();
+
     // Reset stack after animation
     setTimeout(() => {
       setMenuStack([{ id: "root", title: title || "Menu", items: links }]);
@@ -221,12 +362,16 @@ export function Drawer({
   return (
     <>
       <motion.button
+        ref={triggerRef}
         whileTap={{ scale: 0.97 }}
         onClick={() => setIsOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
         className={cn(
           "bg-blue-500 hover:bg-blue-400",
           "px-6 py-3 text-white rounded-full cursor-pointer",
           "transition-colors ease-out duration-300 font-medium shadow-lg shadow-zinc-900/20",
+          "outline-none",
           className
         )}
       >
@@ -237,8 +382,21 @@ export function Drawer({
         isOpen={isOpen}
         onClose={handleClose}
         className={drawerClassName}
+        titleId={titleId}
+        descriptionId={descriptionId}
       >
         <div className="flex overflow-hidden flex-col gap-4">
+          {/* Accessible Title (Visually hidden or part of UI) */}
+          {/* We render a visible title if provided, acting as the label */}
+          {title && (
+            <h2
+              id={titleId}
+              className="text-lg font-semibold text-zinc-900 px-2"
+            >
+              {menuStack.length > 1 ? currentMenu.title : title}
+            </h2>
+          )}
+
           {children}
 
           {links.length > 0 && currentMenu && (
@@ -250,7 +408,8 @@ export function Drawer({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
                     onClick={handlePop}
-                    className="flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors mb-2"
+                    aria-label="Go back to previous menu"
+                    className="flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-zinc-900 transition-colors mb-2 px-2 outline-none rounded-lg w-fit"
                   >
                     <ChevronLeft size={18} />
                     Back
